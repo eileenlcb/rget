@@ -7,32 +7,53 @@ use std::io::copy;
 use clap::{App, Arg};
 use reqwest::blocking::Client;
 use failure::{format_err, Fallible};
+use console::style;
 
 fn main(){
     let matches = App::new("Rget")
     .version("0.1.0")
     .author("eileenlcb")
     .about("A simple wget clone")
-    .arg(Arg::with_name("url")
+    .arg(Arg::with_name("FILE")
+        .short("O")
+        .long("output-document")
+        .help("write documents to FILE")
+        .required(false)
+        .takes_value(true))
+    .arg(Arg::with_name("URL")
         .help("The url to download")
         .required(true)
         .index(1))
         .help("Sets the output file to use")
     .get_matches();
 
-    let url = matches.value_of("url").unwrap();
+    let url = matches.value_of("URL").unwrap();
+    let file_name = matches.value_of("FILE");
+
+    let resume_download = false;
     println!("url: {}", url);
-    match download(url, false) {
+    match download(url, false,file_name,resume_download) {
         Ok(_) => println!("Downloaded {} successfully!", url),
         Err(e) => println!("Error downloading {}: {}", url, e),
     };
+
 }
 
 
-fn download(target:&str,quiet_mode:bool)->Result<(),Box<dyn::std::error::Error>>{
+fn download(target:&str,quiet_mode:bool,filename: Option<&str>, resume_download: bool)->Result<(),Box<dyn::std::error::Error>>{
+    
+    let fname = match filename{
+        Some(name) => name,
+        None => target.split("/").last().unwrap(),
+    };
+    
     let url = utils::parse_url(target)?;
     let client = Client::new();
     let mut resp = client.get(url.as_ref()).send()?;
+    
+
+    utils::print(format!("HTTP request sent... {} and additional text", style(format!("{}", resp.status())).green()),
+quiet_mode);
     
     match url.scheme() {
         "ftp" => ftp_download(),

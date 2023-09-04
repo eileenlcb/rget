@@ -21,3 +21,9 @@ pub fn parse_url(url: &str) -> Result<Url,ParseError> {
 pub fn gen_error(msg:String) -> Fallible<()>{
     bail!(msg)
 }
+
+pub fn print(string:String,quiet_mode:bool){
+    if !quiet_mode{
+        println!("{}",string);
+    }
+}
