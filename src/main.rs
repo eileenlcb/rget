@@ -1,6 +1,9 @@
 #![allow(unused)]
 mod utils;
 
+use std::fs::File;
+use std::io::copy;
+
 use clap::{App, Arg};
 use reqwest::blocking::Client;
 use failure::{format_err, Fallible};
@@ -18,7 +21,11 @@ fn main(){
     .get_matches();
 
     let url = matches.value_of("url").unwrap();
-    println!("url: {}", url)
+    println!("url: {}", url);
+    match download(url, false) {
+        Ok(_) => println!("Downloaded {} successfully!", url),
+        Err(e) => println!("Error downloading {}: {}", url, e),
+    };
 }
 
 
@@ -29,7 +36,7 @@ fn download(target:&str,quiet_mode:bool)->Result<(),Box<dyn::std::error::Error>>
     
     match url.scheme() {
         "ftp" => ftp_download(),
-        "http" | "https" => http_download(),
+        "http" | "https" => http_download(target),
         _ => utils::gen_error(format!("unsupported url scheme '{}'", url.scheme())),
     };
 
@@ -40,6 +47,19 @@ fn ftp_download() -> Fallible<()> {
     Ok(())
 }
 
-fn http_download() -> Fallible<()>{
+fn http_download(url:&str) -> Fallible<()>{
+    let resp = Client::new().get(url).send()?;
+    let headers = resp.headers();
+    let server_supports_bytes = match headers.get("Accept-Ranges") {
+        Some(val) => val == "bytes",
+        None => false,
+    };
+
+    Ok(())
+}
+
+fn save_to_file(contents: &mut Vec<u8>, fname: &str) -> Result<(), std::io::Error> {
+    let mut file = File::create(fname).unwrap();
+    copy(&mut contents.as_slice(), &mut file).unwrap();
     Ok(())
 }
