@@ -5,9 +5,11 @@ use std::fs::File;
 use std::io::copy;
 
 use clap::{App, Arg};
-use reqwest::blocking::Client;
+use reqwest::Client;
 use failure::{format_err, Fallible};
 use console::style;
+use indicatif::{ProgressBar, ProgressStyle, HumanBytes};
+// use reqwest::header::{Range, ByteRangeSpec, ContentLength, ContentType, AcceptRanges, RangeUnit};
 
 fn main(){
     let matches = App::new("Rget")
@@ -49,11 +51,54 @@ fn download(target:&str,quiet_mode:bool,filename: Option<&str>, resume_download:
     
     let url = utils::parse_url(target)?;
     let client = Client::new();
-    let mut resp = client.get(url.as_ref()).send()?;
+    let mut resp = client.get(url.as_ref())?.send()?;
     
 
     utils::print(format!("HTTP request sent... {} and additional text", style(format!("{}", resp.status())).green()),
 quiet_mode);
+
+    if resp.status().is_success(){
+        let headers = resp.headers().clone();
+        let ct_len = headers.get("Content-Length").unwrap().to_str().unwrap();
+        let ct_type = headers.get("Content-Type").unwrap().to_str().unwrap();
+
+        let len = ct_len.parse::<u64>().unwrap();
+        let len_option = if len > 0 { Some(len) } else { None };
+
+        utils::print(format!("Length: {} ({})", style(len).green(), style(format!("{}", HumanBytes(len))).red()), quiet_mode);
+        utils::print(format!("Type: {}", style(ct_type).green()), quiet_mode);
+        utils::print(format!("Saving to: {}", style(fname).green()), quiet_mode);
+
+        let chunk_size = match len_option{
+            Some(x) => x as usize/99,
+            None => 1024usize,
+        };
+
+
+        let bar =  create_progress_bar(quiet_mode,fname,len_option);
+        let mut buf = Vec::new();
+
+        loop {
+            let mut buffer = vec![0; chunk_size];
+            let bcount = resp.read(&mut buffer[..]).unwrap();
+            buffer.truncate(bcount);
+            if !buffer.is_empty() {
+                buf.extend(buffer.into_boxed_slice()
+                               .into_vec()
+                               .iter()
+                               .cloned());
+                bar.inc(bcount as u64);
+            } else {
+                break;
+            }
+        }
+
+        bar.finish();
+
+        save_to_file(&mut buf, fname)?;
+
+        
+    }
     
     match url.scheme() {
         "ftp" => ftp_download(),
@@ -83,4 +128,25 @@ fn save_to_file(contents: &mut Vec<u8>, fname: &str) -> Result<(), std::io::Erro
     let mut file = File::create(fname).unwrap();
     copy(&mut contents.as_slice(), &mut file).unwrap();
     Ok(())
+}
+
+fn create_progress_bar(quiet_mode:bool,msg:&str,length:Option<u64>) -> ProgressBar{
+    let bar = match quiet_mode{
+        true => ProgressBar::hidden(),
+        false => match length{
+            Some(len) => ProgressBar::new(len),
+            None => ProgressBar::new_spinner(),
+        }
+    };
+    bar.set_message(msg);
+
+    match length.is_some() {
+        true => bar
+            .set_style(ProgressStyle::default_bar()
+                .template("{msg} {spinner:.green} {percent}% [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} eta: {eta}")
+                .progress_chars("=>  ")),
+        false => bar.set_style(ProgressStyle::default_spinner()),
+    };
+
+    bar
 }
