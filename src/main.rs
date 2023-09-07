@@ -1,11 +1,11 @@
 #![allow(unused)]
 mod utils;
 
-use std::fs::File;
+use std::{fs::File, io::Read};
 use std::io::copy;
 
 use clap::{App, Arg};
-use reqwest::Client;
+use reqwest::blocking::{Client, Request,Response};
 use failure::{format_err, Fallible};
 use console::style;
 use indicatif::{ProgressBar, ProgressStyle, HumanBytes};
@@ -51,8 +51,7 @@ fn download(target:&str,quiet_mode:bool,filename: Option<&str>, resume_download:
     
     let url = utils::parse_url(target)?;
     let client = Client::new();
-    let mut resp = client.get(url.as_ref())?.send()?;
-    
+    let mut resp = client.get(url.as_ref()).send()?;
 
     utils::print(format!("HTTP request sent... {} and additional text", style(format!("{}", resp.status())).green()),
 quiet_mode);
@@ -77,11 +76,13 @@ quiet_mode);
 
         let bar =  create_progress_bar(quiet_mode,fname,len_option);
         let mut buf = Vec::new();
-
+        
+        let mut count = 0;
         loop {
+            count += 1;
+            println!("count: {}",count);
             let mut buffer = vec![0; chunk_size];
             let bcount = resp.read(&mut buffer[..]).unwrap();
-            buffer.truncate(bcount);
             if !buffer.is_empty() {
                 buf.extend(buffer.into_boxed_slice()
                                .into_vec()
@@ -91,6 +92,17 @@ quiet_mode);
             } else {
                 break;
             }
+            
+            // buffer.truncate(bcount);
+            // if !buffer.is_empty() {
+            //     buf.extend(buffer.into_boxed_slice()
+            //                    .into_vec()
+            //                    .iter()
+            //                    .cloned());
+            //     bar.inc(bcount as u64);
+            // } else {
+            //     break;
+            // }
         }
 
         bar.finish();
