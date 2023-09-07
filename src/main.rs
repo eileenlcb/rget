@@ -84,9 +84,7 @@ quiet_mode);
             let mut buffer = vec![0; chunk_size];
             let bcount = resp.read(&mut buffer[..]).unwrap();
             if !buffer.is_empty() {
-                buf.extend(buffer.into_boxed_slice()
-                               .into_vec()
-                               .iter()
+                buf.extend(buffer.iter()
                                .cloned());
                 bar.inc(bcount as u64);
             } else {
