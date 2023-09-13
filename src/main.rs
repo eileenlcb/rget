@@ -3,7 +3,7 @@ mod utils;
 
 use std::{fs::File, io::Read};
 use std::path::Path;
-use std::io::copy;
+use std::io::{Write,BufWriter};
 use std::env;
 use clap::{App, Arg};
 use reqwest::blocking::{Client, Request,Response};
@@ -73,10 +73,13 @@ quiet_mode);
             Some(x) => x as usize/99,
             None => 1024usize,
         };
+        let mut file_path = Path::new("./tmp").to_path_buf();
+        file_path.push(fname);
+        let out_file = File::create(file_path)?;
+        let mut writer = BufWriter::new(out_file);
 
 
         let bar =  create_progress_bar(quiet_mode,fname,len_option);
-        let mut buf = Vec::new();
         
         let mut count = 0;
         loop {
@@ -85,8 +88,9 @@ quiet_mode);
             let bcount = resp.read(&mut buffer[..]).unwrap();
             buffer.truncate(bcount);
             if !buffer.is_empty() {
-                buf.extend(buffer.iter()
-                               .cloned());
+                writer.write(buffer.as_slice()).unwrap();
+                // buf.extend(buffer.iter()
+                //                .cloned());
                 bar.inc(bcount as u64);
             } else {
                 break;
@@ -96,7 +100,6 @@ quiet_mode);
 
         bar.finish();
 
-        save_to_file(&mut buf, fname)?;
 
         
     }
@@ -125,13 +128,6 @@ fn http_download(url:&str) -> Fallible<()>{
     Ok(())
 }
 
-fn save_to_file(contents: &mut Vec<u8>, fname: &str) -> Result<(), std::io::Error> {
-    let mut tmp_dir = Path::new("./tmp").to_path_buf();
-    tmp_dir.push(fname);
-    let mut file = File::create(&tmp_dir).unwrap();
-    copy(&mut contents.as_slice(), &mut file).unwrap();
-    Ok(())
-}
 
 fn create_progress_bar(quiet_mode:bool,msg:&str,length:Option<u64>) -> ProgressBar{
     let bar = match quiet_mode{
