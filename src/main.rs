@@ -80,9 +80,9 @@ quiet_mode);
         let mut count = 0;
         loop {
             count += 1;
-            println!("count: {}",count);
             let mut buffer = vec![0; chunk_size];
             let bcount = resp.read(&mut buffer[..]).unwrap();
+            buffer.truncate(bcount);
             if !buffer.is_empty() {
                 buf.extend(buffer.iter()
                                .cloned());
@@ -91,16 +91,6 @@ quiet_mode);
                 break;
             }
             
-            // buffer.truncate(bcount);
-            // if !buffer.is_empty() {
-            //     buf.extend(buffer.into_boxed_slice()
-            //                    .into_vec()
-            //                    .iter()
-            //                    .cloned());
-            //     bar.inc(bcount as u64);
-            // } else {
-            //     break;
-            // }
         }
 
         bar.finish();
