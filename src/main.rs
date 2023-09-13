@@ -2,8 +2,9 @@
 mod utils;
 
 use std::{fs::File, io::Read};
+use std::path::Path;
 use std::io::copy;
-
+use std::env;
 use clap::{App, Arg};
 use reqwest::blocking::{Client, Request,Response};
 use failure::{format_err, Fallible};
@@ -125,7 +126,9 @@ fn http_download(url:&str) -> Fallible<()>{
 }
 
 fn save_to_file(contents: &mut Vec<u8>, fname: &str) -> Result<(), std::io::Error> {
-    let mut file = File::create(fname).unwrap();
+    let mut tmp_dir = Path::new("./tmp").to_path_buf();
+    tmp_dir.push(fname);
+    let mut file = File::create(&tmp_dir).unwrap();
     copy(&mut contents.as_slice(), &mut file).unwrap();
     Ok(())
 }
